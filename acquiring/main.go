@@ -351,7 +351,7 @@ func Pay(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	l, err := net.Listen("tcp", "109.200.156.69:8080")
+	l, err := net.Listen("tcp", ":5000")
 	if err != nil {
 		print(err.Error)
 	}
