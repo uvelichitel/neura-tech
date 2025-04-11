@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
@@ -31,6 +32,7 @@ var (
 	terminalKey      = os.Getenv("TERMINAL_KEY")
 	connStr          = os.Getenv("CONN_STR")
 	signalURL        = os.Getenv("SIGNAL_URL")
+	signalToken      = os.Getenv("SIGNAL_TOKEN")
 )
 var logWriter io.Writer
 var logger *log.Logger = log.New(logWriter, "neura", log.LstdFlags)
@@ -226,7 +228,18 @@ func Signal(s *PaymentSignal) error {
 		// TODO
 	}
 	body := bytes.NewBuffer(json)
-	resp, err := http.Post(signalURL, "application/json", body)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", signalURL, body)
+	if err != nil {
+		return err
+	}
+	var bearer = "Bearer " + signalToken
+	req.Header.Set("Authorization", bearer)
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/json")
+	client := http.DefaultClient
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -279,14 +292,15 @@ func InitiatePayment(o *InitOrder, u string) (string, error) {
 	resp, err := http.Post("https://securepay.tinkoff.ru/v2/Init", "application/json", cont)
 	// resp, err := http.Post("https://rest-api-test.tinkoff.ru/v2/init", "application/json", bytes.NewReader(jsn))
 	if err != nil {
-		//		w.WriteHeader(http.StatusInternalServerError)
-		//		w.Write([]byte(err.Error()))
 		return "", err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		//	w.WriteHeader(resp.StatusCode)
-		//	w.Write([]byte("Платеж не проходит"))
-		return "", errors.New("Платеж не проходит")
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", err
+		}
+		return "", errors.New(string(body))
 		//TODO
 	}
 	rspns := new(InitResponse)
@@ -417,5 +431,3 @@ func main() {
 //	CONFIRMED
 //	PARTIAL_REFUNDED
 //	REFUNDED
-
-
