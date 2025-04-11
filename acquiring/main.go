@@ -22,17 +22,6 @@ import (
 
 type Status int8
 
-const (
-	NEW Status = iota + 1
-	CANCELED
-	AUTHORIZED
-	PARTIAL_REVERSED
-	REVERSED
-	CONFIRMED
-	PARTIAL_REFUNDED
-	REFUNDED
-)
-
 const layout = "060102150405"
 
 var (
@@ -42,9 +31,6 @@ var (
 	terminalKey      = os.Getenv("TERMINAL_KEY")
 	connStr          = os.Getenv("CONN_STR")
 	signalURL        = os.Getenv("SIGNAL_URL")
-
-// db               *sql.DB
-// stmts            = make(map[string]*sql.Stmt)
 )
 var logWriter io.Writer
 var logger *log.Logger = log.New(logWriter, "neura", log.LstdFlags)
@@ -80,7 +66,7 @@ type InitPayment struct {
 	SuccessURL      string `json:"SuccessURL,omitempty"`
 	FailURL         string `json:"FailURL,omitempty"`
 	RedirectDueDate string `json:"RedirectDueDate,omitempty"`
-	DATA            `json:"DATA,omitempty"`
+	DATA
 	//Receipt Receipt `json:"Receipt ,omitempty"`
 }
 
@@ -146,18 +132,7 @@ type PaymentSignal struct {
 	Signature  string  `json:"signature"`
 }
 
-//func ConnectionString() string {
-//	connStr, status := os.LookupEnv("CONN_STR")
-//	if !status {
-//		log.Fatalln("Missing environment variable CONN_STR")
-//	}
-//
-//	return connStr
-//}
-
 func Connect(connStr string) (*sql.DB, error) {
-	//connStr := ConnectionString()
-
 	db, err := sql.Open("pgx", connStr)
 
 	if err != nil {
@@ -204,7 +179,7 @@ func GetNotification(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(notification); err != nil {
 		//TODO
 	}
-	userID, err  := strconv.ParseInt(notification.OrderId[:13], 10, 64)
+	userID, err := strconv.ParseInt(notification.OrderId[:13], 10, 64)
 	if err != nil {
 		// TODO
 	}
@@ -212,16 +187,20 @@ func GetNotification(w http.ResponseWriter, r *http.Request) {
 	p.Amount = float64(notification.Amount) / 100
 	p.Status = notification.Status
 	p.Payment_id = notification.PaymentId.String()
-	p.User_id = userID 
+	p.User_id = userID
 	if err != nil {
 		// TODO
 	}
 	p.Sign()
 	err = Signal(p)
 	if err != nil {
-		// TODO recall
+		// TODO recall, context with timeout, return, place in queue
 	}
-	err = db.UpdateStatus(notification)
+	if notification.Status != "CONFIRMED" {
+		err = db.UpdateStatus(notification)
+	} else {
+		err = db.Persist(notification)
+	}
 	if err != nil {
 		// TODO
 	}
@@ -235,10 +214,10 @@ func (s *PaymentSignal) Sign() {
 	// Write Data to it
 	amount := strconv.FormatFloat(s.Amount, 'f', 2, 64)
 	userID := strconv.FormatInt(s.User_id, 10)
-	data := s.Payment_id + userID + amount +s.Status
+	data := s.Payment_id + userID + amount + s.Status
 	h.Write([]byte(data))
 	// Get result and encode as hexadecimal string
-	s.Signature =  hex.EncodeToString(h.Sum(nil))
+	s.Signature = hex.EncodeToString(h.Sum(nil))
 }
 
 func Signal(s *PaymentSignal) error {
@@ -263,39 +242,24 @@ func EncodeOrderId(u string) string {
 	return u + "#" + t
 }
 
-func DecodeOrderId(n *Notification) (string, time.Time) {
-	u := n.OrderId[12:]
-	t, err := time.Parse(layout, n.OrderId[:13])
+func DecodeOrderId(id string) (string, time.Time) {
+	u := id[12:]
+	t, err := time.Parse(layout, id[:13])
 	if err != nil {
 		t = time.Now()
 	}
 	return u, t
-}
-func (n *Notification) Persist(s Store) error {
-	customerKey, time := DecodeOrderId(n)
-	_, err := s.stmts["payment"].Exec(n.PaymentId, n.Status, time, n.OrderId, n.Amount, customerKey)
-	return err
-}
-
-func (s Store) UpdateStatus(n *Notification) error {
-	_, err := s.stmts["updateStatus"].Exec(n.Status, n.PaymentId)
-	return err
-}
-
-func (s Store) Remove(n Notification) error {
-	_, err := s.stmts["remove"].Exec(n.PaymentId)
-	return err
 }
 
 func InitiatePayment(o *InitOrder, u string) (string, error) {
 	o.Amount *= 100
 	orderId := EncodeOrderId(u)
 	req := &InitPayment{
-		TerminalKey: terminalKey,
-		Amount: o.Amount,
-		OrderId: orderId,
-		Description: o.Description,
-		CustomerKey: u,
+		TerminalKey:     terminalKey,
+		Amount:          o.Amount,
+		OrderId:         orderId,
+		Description:     o.Description,
+		CustomerKey:     u,
 		Language:        "ru",
 		NotificationURL: notificationURL,
 		//		SuccessURL:      SuccessURL,
@@ -330,7 +294,7 @@ func InitiatePayment(o *InitOrder, u string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return  rspns.PaymentURL, nil
+	return rspns.PaymentURL, nil
 }
 
 func Pay(w http.ResponseWriter, r *http.Request) {
@@ -355,16 +319,6 @@ func Pay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	initOrder.Amount *= 100
-	//orderId := new(int64)
-	//err = db.QueryRow("SELECT nextval('orderid')").Scan(orderId)
-	//if err != nil {
-	// TODO
-	//}
-	//order := Order{
-	//	OrderId:     strconv.FormatInt(*orderId, 10),
-	//	InitOrder:   *initOrder,
-	//	CustomerKey: user,
-	//}
 	paymentURL, err := InitiatePayment(initOrder, user)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -406,6 +360,22 @@ func (s Store) Cleanup() {
 	s.Close()
 }
 
+func (s Store) Persist(n *Notification) error {
+	customerKey, time := DecodeOrderId(n.OrdId)
+	_, err := s.stmts["payment"].Exec(n.PaymentId, n.Status, time, n.OrderId, n.Amount, customerKey)
+	return err
+}
+
+func (s Store) UpdateStatus(n *Notification) error {
+	_, err := s.stmts["updateStatus"].Exec(n.Status, n.PaymentId)
+	return err
+}
+
+func (s Store) Remove(n Notification) error {
+	_, err := s.stmts["remove"].Exec(n.PaymentId)
+	return err
+}
+
 func main() {
 
 	l, err := net.Listen("tcp", ":5000")
@@ -439,3 +409,13 @@ func main() {
 //
 //
 //
+//	NEW
+//	CANCELED
+//	AUTHORIZED
+//	PARTIAL_REVERSED
+//	REVERSED
+//	CONFIRMED
+//	PARTIAL_REFUNDED
+//	REFUNDED
+
+

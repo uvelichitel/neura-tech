@@ -1,22 +1,16 @@
 package main
 
 import (
-	"strconv"
 	"testing"
+	"time"
 )
 
 func TestCalcToken(t *testing.T) {
 	i := InitPayment{
 		TerminalKey: "MerchantTerminalKey",
-		Payment: Payment{
-			Order: Order{
-				InitOrder: InitOrder{
-					Amount:      19200,
-					Description: "Подарочная карта на 1000 рублей",
-				},
-				OrderId: "21090",
-			},
-},
+		Amount:      19200,
+		Description: "Подарочная карта на 1000 рублей",
+		OrderId:     "21090",
 	}
 	terminalPassword = "usaf8fw8fsw21g"
 	i.CalcToken()
@@ -41,23 +35,54 @@ func TestIsValidToken(t *testing.T) {
 	}
 }
 
-func TestSignSignal(t *testing.T) {
-	p := Payment{
-		PaymentId: "payment_1234",
-		Order: Order{
-			InitOrder: InitOrder{
-				Amount: 100,
-			},
-			CustomerKey: "1",
-		},
-		Status: "success",
+func TestSign(t *testing.T) {
+	s := PaymentSignal{
+		Payment_id: "payment_1234",
+		Amount:     100,
+		Status:     "success",
+		User_id:    1,
 	}
-	data := p.PaymentId + p.CustomerKey + strconv.FormatInt(p.Amount, 10) + p.Status
-	signature := SignSignal(hmacSecret, data)
-// TODO
-	want := "9ba6735dd544efcb2904a511cea8c516e2d5f8b096d7ff5a4bfc653af2c73473" // TODO
+	s.Sign()
+	signature := s.Signature
+	want := "9ba6735dd544efcb2904a511cea8c516e2d5f8b096d7ff5a4bfc653af2c73473"
 	got := signature
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestConnect(t *testing.T) {
+	connStr := "TODO"
+	_, err := Connect(connStr)
+	if err != nil {
+		t.Error(err)
+	}
+	// TODO
+}
+
+func TestSignal(t *testing.T) {
+	signalURL = "TODO"
+	s := &PaymentSignal{
+		Payment_id: "payment_1234",
+		Amount:     100,
+		Status:     "success",
+		User_id:    1,
+	}
+	s.Sign()
+	err := Signal(s)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestEncoder(t *testing.T) {
+	u := "2"
+	id := EncodeOrderId(u)
+	ug, tm := DecodeOrderId(id)
+	if ug != u {
+		t.Error("Mismatch userId decoding")
+	}
+	if time.Now().Unix()-tm.Unix() > 100 || time.Now().Unix()-tm.Unix() < 100 {
+		t.Error("Mismatch time decoding")
 	}
 }
