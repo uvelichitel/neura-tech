@@ -52,7 +52,7 @@ func TestSign(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
-	connStr := "TODO"
+	connStr := "postgres://merchant:broccoly@localhost:5432/payments"
 	_, err := Connect(connStr)
 	if err != nil {
 		t.Error(err)

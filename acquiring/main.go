@@ -361,7 +361,7 @@ func (s Store) Cleanup() {
 }
 
 func (s Store) Persist(n *Notification) error {
-	customerKey, time := DecodeOrderId(n.OrdId)
+	customerKey, time := DecodeOrderId(n.OrderId)
 	_, err := s.stmts["payment"].Exec(n.PaymentId, n.Status, time, n.OrderId, n.Amount, customerKey)
 	return err
 }
