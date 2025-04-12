@@ -36,15 +36,16 @@ func TestIsValidToken(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
+	hmacSecret = []byte("neura-tech")
 	s := PaymentSignal{
-		Payment_id: "payment_1234",
-		Amount:     100,
+		Payment_id: "payment_1235",
+		Amount:     500,
 		Status:     "success",
-		User_id:    1,
+		User_id:    11,
 	}
 	s.Sign()
 	signature := s.Signature
-	want := "9ba6735dd544efcb2904a511cea8c516e2d5f8b096d7ff5a4bfc653af2c73473"
+	want := "291e3bb97ac02cbb7c058adb55bb1f3068da297020f849f5a903b9108c9df3a7|"
 	got := signature
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
@@ -52,7 +53,7 @@ func TestSign(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
-	connStr := "postgres://merchant:broccoly@localhost:5432/payments"
+	connStr := "postgres://merchant:broccoly@localhost:5433/payments"
 	_, err := Connect(connStr)
 	if err != nil {
 		t.Error(err)
@@ -61,28 +62,33 @@ func TestConnect(t *testing.T) {
 }
 
 func TestSignal(t *testing.T) {
-	signalURL = "TODO"
+	hmacSecret = []byte("neura-tech")
+	signalURL = "https://gateway.neura-tech.pro/v1/balance/webhook/payment"
+	//amount := strconv.FormatFloat(s.Amount, 'f', 2, 64)
+	//signalToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMSIsImV4cCI6MTc0NDQ1MzE3MiwidHlwZSI6ImFjY2VzcyJ9.uepNh2AnSEamAFDRCfeQR_Quktftq2B9zV77iejaKKI"
 	s := &PaymentSignal{
-		Payment_id: "payment_1234",
-		Amount:     100,
+		Payment_id: "payment_1235",
+		Amount:     500,
 		Status:     "success",
-		User_id:    1,
+		User_id:    11,
 	}
 	s.Sign()
 	err := Signal(s)
 	if err != nil {
-		t.Error(err)
+		t.Error(err, "\n", s.Signature)
 	}
 }
 
 func TestEncoder(t *testing.T) {
+	layout = "060102150405"
 	u := "2"
 	id := EncodeOrderId(u)
+	t.Log(id)
 	ug, tm := DecodeOrderId(id)
 	if ug != u {
-		t.Error("Mismatch userId decoding")
+		t.Error("Mismatch userId decoding ", u, ug)
 	}
-	if time.Now().Unix()-tm.Unix() > 100 || time.Now().Unix()-tm.Unix() < 100 {
-		t.Error("Mismatch time decoding")
+	if time.Now().Day() != tm.Day() {
+		t.Error("Mismatch time decoding ", tm, time.Now(), " NOW ", time.Now())
 	}
 }

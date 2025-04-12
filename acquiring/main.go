@@ -23,7 +23,7 @@ import (
 
 type Status int8
 
-const layout = "060102150405"
+var layout = "060102150405"
 
 var (
 	notificationURL  = os.Getenv("NOTIFICATION_URL")
@@ -43,10 +43,16 @@ type Store struct {
 	*sql.DB
 }
 
-// Tbank
 type InitOrder struct {
 	Amount      int64  `json:"Amount"`
 	Description string `json:"Description"`
+}
+
+type InitOrderResponce struct {
+// Tbank
+PaymentURL string `json:"PaymentURL"`
+
+
 }
 
 type DATA struct {
@@ -129,7 +135,7 @@ type CanselResponse struct { // TODO
 type PaymentSignal struct {
 	Payment_id string  `json:"payment_id"`
 	User_id    int64   `json:"user_id"`
-	Amount     float64 `json:"amount"`
+	Amount     int64 `json:"amount"`
 	Status     string  `json:"status"`
 	Signature  string  `json:"signature"`
 }
@@ -186,7 +192,7 @@ func GetNotification(w http.ResponseWriter, r *http.Request) {
 		// TODO
 	}
 	p := new(PaymentSignal)
-	p.Amount = float64(notification.Amount) / 100
+	p.Amount = notification.Amount / 100
 	p.Status = notification.Status
 	p.Payment_id = notification.PaymentId.String()
 	p.User_id = userID
@@ -214,7 +220,7 @@ func (s *PaymentSignal) Sign() {
 	// Create a new HMAC by defining the hash type and the key (as byte array)
 	h := hmac.New(sha256.New, hmacSecret)
 	// Write Data to it
-	amount := strconv.FormatFloat(s.Amount, 'f', 2, 64)
+	amount := strconv.FormatInt(s.Amount, 10)
 	userID := strconv.FormatInt(s.User_id, 10)
 	data := s.Payment_id + userID + amount + s.Status
 	h.Write([]byte(data))
@@ -225,7 +231,7 @@ func (s *PaymentSignal) Sign() {
 func Signal(s *PaymentSignal) error {
 	json, err := json.Marshal(s)
 	if err != nil {
-		// TODO
+		return err
 	}
 	body := bytes.NewBuffer(json)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -234,8 +240,8 @@ func Signal(s *PaymentSignal) error {
 	if err != nil {
 		return err
 	}
-	var bearer = "Bearer " + signalToken
-	req.Header.Set("Authorization", bearer)
+//	var bearer = "Bearer " + signalToken
+//	req.Header.Set("Authorization", bearer)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
 	client := http.DefaultClient
@@ -256,8 +262,8 @@ func EncodeOrderId(u string) string {
 }
 
 func DecodeOrderId(id string) (string, time.Time) {
-	u := id[12:]
-	t, err := time.Parse(layout, id[:13])
+	u := id[:len(id) - 13]
+	t, err := time.Parse(layout, id[len(id) - 12:])
 	if err != nil {
 		t = time.Now()
 	}
