@@ -1,0 +1,13 @@
+Endpoint:	"109.200.156.69:5000"
+Request JSON:
+{
+	"Amount": 250,
+	"Description": "Описание заказа. Значение параметра будет отображено на платежной форме."
+}
+Responce:
+StatusCode 200    // или код ошибки например 405
+JSON:
+{
+	"PaymentURL": "https://securepay.tinkoff.ru/new/fU1ppgqa",
+	"Details": "Что пошло не так"
+}
