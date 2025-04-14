@@ -1,3 +1,30 @@
+Исходный код: https://github.com/uvelichitel/neura-tech
+
+Зависимости:
+postgres
+go (стандартная библиотека)
+
+Переменные окружения:
+NOTIFICATION_URL	//URL на веб-сайте мерчанта, куда будет отправлен POST-запрос о статусе выполнения вызываемых методов 
+HMACSECRET			//Подпись
+TERMINAL_PASSWORD	//Пароль терминала. Выдается банком.
+TERMINAL_KEY		//Идентификатор терминала. Выдается банком.
+CONN_STR			//Соединение с postgres "postgres://merchant:broccoly@localhost:5433/payments"
+SIGNAL_URL			//Куда сообщить о платеже
+SIGNAL_TOKEN		//Подпись сообщения о платеже
+SUCCESS_URL			//Куда вернуть пользователя если он заплатил
+FAIL_URL			//Куда вернуть пользователя если он не стал платить
+
+Структура SQL таблицы:
+CREATE TABLE payments (
+paymentid VARCHAR(20),
+status VARCHAR(20),
+date DATE,
+orderid VARCHAR(36),
+amount BIGINT,
+customerkey VARCHAR(36),
+);
+
 Endpoint:	"109.200.156.69:5000"
 Request JSON:
 {

@@ -49,10 +49,8 @@ type InitOrder struct {
 }
 
 type InitOrderResponce struct {
-// Tbank
-PaymentURL string `json:"PaymentURL"`
-
-
+	PaymentURL string `json:"PaymentURL"`
+	Details    string `json:"Details"`
 }
 
 type DATA struct {
@@ -133,11 +131,11 @@ type CanselResponse struct { // TODO
 }
 
 type PaymentSignal struct {
-	Payment_id string  `json:"payment_id"`
-	User_id    int64   `json:"user_id"`
-	Amount     int64 `json:"amount"`
-	Status     string  `json:"status"`
-	Signature  string  `json:"signature"`
+	Payment_id string `json:"payment_id"`
+	User_id    int64  `json:"user_id"`
+	Amount     int64  `json:"amount"`
+	Status     string `json:"status"`
+	Signature  string `json:"signature"`
 }
 
 func Connect(connStr string) (*sql.DB, error) {
@@ -240,8 +238,8 @@ func Signal(s *PaymentSignal) error {
 	if err != nil {
 		return err
 	}
-//	var bearer = "Bearer " + signalToken
-//	req.Header.Set("Authorization", bearer)
+	//	var bearer = "Bearer " + signalToken
+	//	req.Header.Set("Authorization", bearer)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
 	client := http.DefaultClient
@@ -262,15 +260,15 @@ func EncodeOrderId(u string) string {
 }
 
 func DecodeOrderId(id string) (string, time.Time) {
-	u := id[:len(id) - 13]
-	t, err := time.Parse(layout, id[len(id) - 12:])
+	u := id[:len(id)-13]
+	t, err := time.Parse(layout, id[len(id)-12:])
 	if err != nil {
 		t = time.Now()
 	}
 	return u, t
 }
 
-func InitiatePayment(o *InitOrder, u string) (string, error) {
+func InitiatePayment(o *InitOrder, u string) (string, string) {
 	o.Amount *= 100
 	orderId := EncodeOrderId(u)
 	req := &InitPayment{
@@ -290,31 +288,27 @@ func InitiatePayment(o *InitOrder, u string) (string, error) {
 	req.CalcToken()
 	jsn, err := json.Marshal(req)
 	if err != nil {
-		//	w.WriteHeader(http.StatusBadRequest)
-		//	w.Write([]byte(err.Error()))
-		return "", err
+		return "", err.Error()
 	}
 	cont := bytes.NewReader(jsn)
 	resp, err := http.Post("https://securepay.tinkoff.ru/v2/Init", "application/json", cont)
 	// resp, err := http.Post("https://rest-api-test.tinkoff.ru/v2/init", "application/json", bytes.NewReader(jsn))
 	if err != nil {
-		return "", err
+		return "", err.Error()
+	}
+	if resp.StatusCode != 200 {
+		return "", "Internal server error"
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "", err
-		}
-		return "", errors.New(string(body))
-		//TODO
-	}
 	rspns := new(InitResponse)
 	err = json.NewDecoder(resp.Body).Decode(rspns)
 	if err != nil {
-		return "", err
+		return "", err.Error()
 	}
-	return rspns.PaymentURL, nil
+	if rspns.ErrorCode != "0" {
+		return "", rspns.Message
+	}
+	return rspns.PaymentURL, ""
 }
 
 func Pay(w http.ResponseWriter, r *http.Request) {
@@ -339,14 +333,18 @@ func Pay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	initOrder.Amount *= 100
-	paymentURL, err := InitiatePayment(initOrder, user)
-	if err != nil {
+	resp := new(InitOrderResponce)
+	resp.PaymentURL, resp.Details = InitiatePayment(initOrder, user)
+	if resp.PaymentURL == "" || resp.Details != "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
-		return
+	} else {
+		w.WriteHeader(http.StatusOK)
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(paymentURL))
+	enc := json.NewEncoder(w)
+	err = enc.Encode(resp)
+	if err != nil {
+		logger.Println(err.Error())
+	}
 }
 
 func MakeStore() (db Store, err error) {
@@ -413,21 +411,9 @@ func main() {
 
 }
 
-//CREATE TABLE IF NOT EXISTS employees (
-//		id SERIAL PRIMARY KEY,
-//		name VARCHAR(100),
-//		position VARCHAR(100),
-//		hire_date DATE
-//	)
-//
-//CREATE SEQUENCE IF NOT EXISTS orderid AS BIGINT START WITH start
-//
-//
 //SELECT nextval('orderid')
 //
 //db.Prepare("INSERT INTO payments (paymentid, status, recurrent, paytype, date, orderid,amount, description, customerkey, operationinitiatortype) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
-//
-//
 //
 //	NEW
 //	CANCELED
