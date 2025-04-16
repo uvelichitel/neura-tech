@@ -23,20 +23,70 @@ import (
 
 type Status int8
 
-var layout = "060102150405"
-
 var (
-	notificationURL  = os.Getenv("NOTIFICATION_URL")
-	hmacSecret       = []byte(os.Getenv("HMACSECRET")) // TODO
-	terminalPassword = os.Getenv("TERMINAL_PASSWORD")
-	terminalKey      = os.Getenv("TERMINAL_KEY")
-	connStr          = os.Getenv("CONN_STR")
-	signalURL        = os.Getenv("SIGNAL_URL")
-	signalToken      = os.Getenv("SIGNAL_TOKEN")
+	layout           = "060102150405"
+	notificationURL  string
+	hmacSecret       string
+	terminalPassword string
+	terminalKey      string
+	connStr          string
+	signalURL        string
+	signalToken      string
+	acquiringURL     string
+	logFile          string
+	logWriter        io.Writer
+	logger           *log.Logger
+	db               Store
 )
-var logWriter io.Writer
-var logger *log.Logger = log.New(logWriter, "neura", log.LstdFlags)
-var db Store
+
+func init() {
+	var (
+		ok  bool
+		err error
+	)
+	logFile, ok = os.LookupEnv("LOG_FILE")
+	if !ok {
+		print("LOG_FILE not set")
+	}
+	logWriter, err = os.OpenFile(logFile, os.O_CREATE|os.O_APPEND, 0755)
+	if err != nil {
+		print(err.Error())
+	}
+	logger = log.New(logWriter, "neura", log.LstdFlags)
+
+	notificationURL, ok = os.LookupEnv("NOTIFICATION_URL")
+	if !ok {
+		logger.Fatal("NOTIFICATION_URL not set")
+	}
+	hmacSecret, ok = os.LookupEnv("HMACSECRET")
+	if !ok {
+		logger.Fatal("HMACSECRET not set")
+	}
+	terminalPassword, ok = os.LookupEnv("TERMINAL_PASSWORD")
+	if !ok {
+		logger.Fatal("TERMINAL_PASSWORD not set")
+	}
+	terminalKey, ok = os.LookupEnv("TERMINAL_KEY")
+	if !ok {
+		logger.Fatal("TERMINAL_KEY not set")
+	}
+	connStr, ok = os.LookupEnv("CONN_STR")
+	if !ok {
+		logger.Fatal("CONN_STR not set")
+	}
+	signalURL, ok = os.LookupEnv("SIGNAL_URL")
+	if !ok {
+		logger.Fatal("SIGNAL_URL not set")
+	}
+	signalToken, ok = os.LookupEnv("SIGNAL_TOKEN")
+	if !ok {
+		logger.Fatal("SIGNAL_TOKEN not set")
+	}
+	acquiringURL, ok = os.LookupEnv("ACQUIRING_URL")
+	if !ok {
+		logger.Fatal("ACQUIRING_URL not set")
+	}
+}
 
 type Store struct {
 	stmts map[string]*sql.Stmt
@@ -216,7 +266,7 @@ func GetNotification(w http.ResponseWriter, r *http.Request) {
 
 func (s *PaymentSignal) Sign() {
 	// Create a new HMAC by defining the hash type and the key (as byte array)
-	h := hmac.New(sha256.New, hmacSecret)
+	h := hmac.New(sha256.New, []byte(hmacSecret))
 	// Write Data to it
 	amount := strconv.FormatInt(s.Amount, 10)
 	userID := strconv.FormatInt(s.User_id, 10)
@@ -395,8 +445,7 @@ func (s Store) Remove(n Notification) error {
 }
 
 func main() {
-
-	l, err := net.Listen("tcp", ":5000")
+	l, err := net.Listen("tcp", acquiringURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -407,14 +456,10 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/payment", Pay)
 	mux.HandleFunc("/notification", GetNotification)
+	print("Listen on: ", acquiringURL)
 	logger.Fatal(http.Serve(l, mux))
-
 }
 
-//SELECT nextval('orderid')
-//
-//db.Prepare("INSERT INTO payments (paymentid, status, recurrent, paytype, date, orderid,amount, description, customerkey, operationinitiatortype) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
-//
 //	NEW
 //	CANCELED
 //	AUTHORIZED

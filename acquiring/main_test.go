@@ -22,7 +22,7 @@ func TestCalcToken(t *testing.T) {
 }
 
 func TestIsValidToken(t *testing.T) {
-	hmacSecret = []byte("neura-tech")
+	hmacSecret = "neura-tech"
 	tokenstring := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZXhwIjoxNzQ0MTYwOTM0LCJ0eXBlIjoiYWNjZXNzIn0.tOhDHtrxiWMUaJcX7Bg4joEUfGShXJj7_BpLV08lTD0"
 	userID, err := IsValidToken(tokenstring)
 	if err != nil {
@@ -36,7 +36,7 @@ func TestIsValidToken(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	hmacSecret = []byte("neura-tech")
+	hmacSecret = "neura-tech"
 	s := PaymentSignal{
 		Payment_id: "payment_1235",
 		Amount:     500,
@@ -45,7 +45,7 @@ func TestSign(t *testing.T) {
 	}
 	s.Sign()
 	signature := s.Signature
-	want := "291e3bb97ac02cbb7c058adb55bb1f3068da297020f849f5a903b9108c9df3a7|"
+	want := "291e3bb97ac02cbb7c058adb55bb1f3068da297020f849f5a903b9108c9df3a7"
 	got := signature
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
@@ -62,7 +62,7 @@ func TestConnect(t *testing.T) {
 }
 
 func TestSignal(t *testing.T) {
-	hmacSecret = []byte("neura-tech")
+	hmacSecret = "neura-tech"
 	signalURL = "https://gateway.neura-tech.pro/v1/balance/webhook/payment"
 	//amount := strconv.FormatFloat(s.Amount, 'f', 2, 64)
 	//signalToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMSIsImV4cCI6MTc0NDQ1MzE3MiwidHlwZSI6ImFjY2VzcyJ9.uepNh2AnSEamAFDRCfeQR_Quktftq2B9zV77iejaKKI"

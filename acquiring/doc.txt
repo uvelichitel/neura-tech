@@ -2,7 +2,10 @@
 
 Зависимости:
 postgres
-go (стандартная библиотека)
+
+Использованные библиотеки Go:
+github.com/golang-jwt/jwt/v5
+github.com/jackc/pgx/v5/stdlib
 
 Переменные окружения:
 NOTIFICATION_URL	//URL на веб-сайте мерчанта, куда будет отправлен POST-запрос о статусе выполнения вызываемых методов 
@@ -14,6 +17,9 @@ SIGNAL_URL			//Куда сообщить о платеже
 SIGNAL_TOKEN		//Подпись сообщения о платеже
 SUCCESS_URL			//Куда вернуть пользователя если он заплатил
 FAIL_URL			//Куда вернуть пользователя если он не стал платить
+ACQUIRING_URL		//Endpoint на котором слушает этот сервис
+LOG_FILE			//Имя файла логов
+
 
 Структура SQL таблицы:
 CREATE TABLE payments (
@@ -22,10 +28,10 @@ status VARCHAR(20),
 date DATE,
 orderid VARCHAR(36),
 amount BIGINT,
-customerkey VARCHAR(36),
+customerkey VARCHAR(36)
 );
 
-Endpoint:	"109.200.156.69:5000"
+ACQUIRING_URL:	"109.200.156.69:5000"
 Request JSON:
 {
 	"Amount": 250,
@@ -38,3 +44,17 @@ JSON:
 	"PaymentURL": "https://securepay.tinkoff.ru/new/fU1ppgqa",
 	"Details": "Что пошло не так"
 }
+
+
+SIGNAL_URL: метод POST
+JSON сигнала системе:
+{
+	"payment_id": "string",
+	"user_id": 0,
+	"amount": 1,
+	"status": "string",
+	"signature": "string"
+}
+
+API т-банк:  https://www.tbank.ru/kassa/dev/payments/
+
