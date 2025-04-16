@@ -237,10 +237,10 @@ func GetNotification(w http.ResponseWriter, r *http.Request) {
 		print(err.Error(), "\n")
 		//TODO
 	}
-	print("Notification status ", notification.Status,  " PaymentID ", notification.PaymentId.String(), "\n")
+	print("Notification status ", notification.Status, " PaymentID ", notification.PaymentId.String(), "\n")
 	userID, err := strconv.ParseInt(notification.OrderId[:len(notification.OrderId)-13], 10, 64)
 	if err != nil {
-print(err.Error(), "\n")
+		print(err.Error(), "\n")
 		// TODO
 	}
 	p := new(PaymentSignal)
@@ -249,23 +249,38 @@ print(err.Error(), "\n")
 	p.Payment_id = notification.PaymentId.String()
 	p.User_id = userID
 	if err != nil {
-print(err.Error(), "\n")
+		print(err.Error(), "\n")
 		// TODO
 	}
 	p.Sign()
 	err = Signal(p)
 	if err != nil {
 		// TODO recall, context with timeout, return, place in queue
-print(err.Error(), "\n")
+		print(err.Error(), "\n")
 	}
 	if notification.Status != "CONFIRMED" {
 		err = db.UpdateStatus(*notification)
 	} else {
 		err = db.Persist(*notification)
+//		if err != nil {
+//			// TODO recall, context with timeout, return, place in queue
+//		}
+//		p := new(PaymentSignal)
+//		p.Amount = notification.Amount / 100
+//		p.Status = "success"
+//		p.Payment_id = notification.PaymentId.String()
+//		p.User_id = userID
+//		p.Sign()
+//		err = Signal(p)
+//		if err != nil {
+//			// TODO recall, context with timeout, return, place in queue
+//			print(err.Error(), "\n")
+//		}
+
 	}
 	if err != nil {
 		// TODO
-print(err.Error(), "\n")
+		print(err.Error(), "\n")
 	}
 	print("OK", "\n")
 	w.WriteHeader(http.StatusOK)
@@ -463,7 +478,7 @@ func main() {
 	}
 	err = db.Init()
 	if err != nil {
-log.Fatal(err)
+		log.Fatal(err)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/payment", Pay)
