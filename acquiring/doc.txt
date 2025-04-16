@@ -31,7 +31,7 @@ amount BIGINT,
 customerkey VARCHAR(36)
 );
 
-ACQUIRING_URL:	"109.200.156.69:5000"
+ACQUIRING_URL:	"109.200.156.69:5000/payment"
 Request JSON:
 {
 	"Amount": 250,

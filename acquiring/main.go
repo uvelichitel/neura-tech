@@ -231,12 +231,16 @@ func IsValidToken(tokenstring string) (string, error) { // TODO if to validate
 }
 
 func GetNotification(w http.ResponseWriter, r *http.Request) {
+	print("Get notification", "\n")
 	notification := new(Notification)
 	if err := json.NewDecoder(r.Body).Decode(notification); err != nil {
+		print(err.Error(), "\n")
 		//TODO
 	}
-	userID, err := strconv.ParseInt(notification.OrderId[:13], 10, 64)
+	print("Notification status ", notification.Status,  " PaymentID ", notification.PaymentId.String(), "\n")
+	userID, err := strconv.ParseInt(notification.OrderId[:len(notification.OrderId)-13], 10, 64)
 	if err != nil {
+print(err.Error(), "\n")
 		// TODO
 	}
 	p := new(PaymentSignal)
@@ -245,21 +249,25 @@ func GetNotification(w http.ResponseWriter, r *http.Request) {
 	p.Payment_id = notification.PaymentId.String()
 	p.User_id = userID
 	if err != nil {
+print(err.Error(), "\n")
 		// TODO
 	}
 	p.Sign()
 	err = Signal(p)
 	if err != nil {
 		// TODO recall, context with timeout, return, place in queue
+print(err.Error(), "\n")
 	}
 	if notification.Status != "CONFIRMED" {
-		err = db.UpdateStatus(notification)
+		err = db.UpdateStatus(*notification)
 	} else {
-		err = db.Persist(notification)
+		err = db.Persist(*notification)
 	}
 	if err != nil {
 		// TODO
+print(err.Error(), "\n")
 	}
+	print("OK", "\n")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
@@ -319,7 +327,6 @@ func DecodeOrderId(id string) (string, time.Time) {
 }
 
 func InitiatePayment(o *InitOrder, u string) (string, string) {
-	o.Amount *= 100
 	orderId := EncodeOrderId(u)
 	req := &InitPayment{
 		TerminalKey:     terminalKey,
@@ -362,6 +369,7 @@ func InitiatePayment(o *InitOrder, u string) (string, string) {
 }
 
 func Pay(w http.ResponseWriter, r *http.Request) {
+	print("Get order", "\n")
 	tokenString := r.Header.Get("Authorization")
 	if tokenString == "" {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -428,13 +436,13 @@ func (s Store) Cleanup() {
 	s.Close()
 }
 
-func (s Store) Persist(n *Notification) error {
+func (s Store) Persist(n Notification) error {
 	customerKey, time := DecodeOrderId(n.OrderId)
 	_, err := s.stmts["payment"].Exec(n.PaymentId, n.Status, time, n.OrderId, n.Amount, customerKey)
 	return err
 }
 
-func (s Store) UpdateStatus(n *Notification) error {
+func (s Store) UpdateStatus(n Notification) error {
 	_, err := s.stmts["updateStatus"].Exec(n.Status, n.PaymentId)
 	return err
 }
@@ -452,6 +460,10 @@ func main() {
 	db, err = MakeStore()
 	if err != nil {
 		log.Fatal(err)
+	}
+	err = db.Init()
+	if err != nil {
+log.Fatal(err)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/payment", Pay)
